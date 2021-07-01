@@ -1,0 +1,6 @@
+---
+nodename_prefix: "robonomics-collator"
+telemetry_url: "wss://telemetry.polkadot.io/submit/ 0"
+chain_id: rococo_local_testnet
+host_collators_count: 1
+robonomics_version: 1.0.0
