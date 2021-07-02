@@ -1,0 +1,13 @@
+---
+# Version of robonomics, by default "1.0.0"
+robonomics_version: 1.0.0     
+
+# Prefix for every node name, by default "robonomics-collator"
+nodename_prefix: robonomics-collator
+
+# Telemetry URL, by default telemetry_url: "wss://telemetry.polkadot.io/submit/ 0"
+telemetry_url: "wss://telemetry.polkadot.io/submit/ 0"
+
+# Example of SS58 address for rewards: "5CGDZ2dpRV3XwYaGi1Nh7oJi4wsn2h1uvMQr7cG3t1aU7FzF"
+# This is required variable and there is no default value!
+lighthouse_account: 
