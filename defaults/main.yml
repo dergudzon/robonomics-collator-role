@@ -2,8 +2,9 @@
 # NOTE: Don't change this var after first launch of the role
 USERNAME_AND_FILENAME_PREFIX: "robonomics-collator"
 
+server_name: servername
 nodename_prefix: "robonomics-collator"
 telemetry_url: "wss://telemetry.polkadot.io/submit/ 0"
 chain_id: rococo_local_testnet
-host_collators_count: 1
+target_collators_count: 1
 robonomics_version: 1.0.0

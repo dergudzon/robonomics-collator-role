@@ -1,34 +1,35 @@
 ---
-## Use inventory var 'host-collators-count' if it's defined, else use it from defaults
-- name: "Set host collators count"
+### SET FACTS
+### Use inventory var 'host-collators-count' if it's defined, else use it from defaults
+- name: "Set target collators count"
   set_fact:
-    host_collators_count: "{{ hostvars[inventory_hostname]['host-collators-count'] | int }}"
-  when: hostvars[inventory_hostname]['host-collators-count'] is defined
+    target_collators_count: "{{ hostvars[inventory_hostname]['target-collators-count'] | int }}"
+  when: hostvars[inventory_hostname]['target-collators-count'] is defined
   tags: [ always ]
 
-- debug: msg={{ host_collators_count }}
+- debug: msg={{ target_collators_count }}
   tags: [ debug ]
 
-- name: "Generate collators index"
-  set_fact: collators_index={{ range(1, host_collators_count|int + 1) | list }}
+### Use inventory var 'server-name' if it's defined, else use it from defaults
+- name: "Set server_name"
+  set_fact:
+    server_name: "{{ hostvars[inventory_hostname]['server-name'] }}"
+  when: hostvars[inventory_hostname]['server-name'] is defined
+  tags: [ always ] 
+
+- debug: msg={{ server_name }}
+  tags: [ debug ]
+
+- name: "Generate target collators index"
+  set_fact: target_collators_index={{ range(1, target_collators_count|int + 1) | list }}
   tags: [always]
     
-- debug: msg={{ collators_index }}
+- debug: msg={{ target_collators_index }}
   tags: [ debug ]
 
-
-- name: "Stop all robonomics services"
-  service:
-    name: "{{ USERNAME_AND_FILENAME_PREFIX }}-{{ item }}.service"
-    state: stopped
-  loop: "{{ collators_index }}"
-  tags: [ always ]
-
-
-## Users Management
 - name: "Generate target collators users list"
   set_fact: target_collators_users={{ target_collators_users | default([]) + ['-'.join((USERNAME_AND_FILENAME_PREFIX, item|string))] }}
-  loop: "{{ collators_index | list }}"
+  loop: "{{ target_collators_index | list }}"
   tags: [ always ]
 
 - debug: msg={{ target_collators_users }}
@@ -52,6 +53,15 @@
 - name: "Unecessary users"
   debug: msg="{{ unecessary_users }}"
   tags: [ debug ]
+### /SET FACTS
+
+
+- name: "Stop all robonomics services"
+  service:
+    name: "{{ item }}.service"
+    state: stopped
+  loop: "{{ existing_collators_users.stdout_lines }}"
+  tags: [ always, stop ]
 
 - name: "Remove unnecessary users"
   ansible.builtin.user:
@@ -60,28 +70,36 @@
     remove: yes
   loop: "{{ unecessary_users }}"
 
-- name: "Remove all collators users"
-  ansible.builtin.user:
-    name: "{{ USERNAME_AND_FILENAME_PREFIX }}-{{ item }}"
+- name: "Delete unecessary services"
+  file:
+    path: /etc/systemd/system/{{ item }}.service
     state: absent
-    remove: yes
-  loop: "{{ collators_index }}"
+  loop: "{{ unecessary_users }}"
+
+
+## REMOVE
+- block:
+    - name: "Remove all collators users"
+      ansible.builtin.user:
+        name: "{{ item }}"
+        state: absent
+        remove: yes
+      loop: "{{ existing_collators_users.stdout_lines }}"
+
+    - name: "Delete all collators services"
+      file:
+        path: /etc/systemd/system/{{ item }}.service
+        state: absent
+      loop: "{{ existing_collators_users.stdout_lines }}"
   tags: [ never, remove ]
-### /Users management
-
-# - name: "Delete unecessary services"
-#   file:
-#     path: /etc/systemd/system/{{ USERNAME_AND_FILENAME_PREFIX }}-{{ item }}.service
-#     state: absent
-#   loop: 
-
+## /REMOVE
 
 
 - name: "Create collators users"
   user:
     name: "{{ USERNAME_AND_FILENAME_PREFIX }}-{{ item }}"
     state: present
-  loop: "{{ collators_index }}"
+  loop: "{{ target_collators_index }}"
 
 
 - name: Download Robonomics archive
@@ -94,7 +112,7 @@
   template:
     src: robonomics-collator.service.j2
     dest: /etc/systemd/system/{{ USERNAME_AND_FILENAME_PREFIX }}-{{ item }}.service
-  loop: "{{ collators_index }}"
+  loop: "{{ target_collators_index }}"
 
 - name: "Reload systemd"
   shell: systemctl daemon-reload
@@ -104,14 +122,14 @@
   file:
     path: /home/{{ USERNAME_AND_FILENAME_PREFIX }}-{{ item }}/.local/share/robonomics/polkadot/chains/{{ chain_id }}/db
     state: absent 
-  loop: "{{ collators_index }}"
+  loop: "{{ target_collators_index }}"
   tags: [ never, remove_relaychain_db, remove_dbs ]
 
 - name: Remove parachain db
   file:
     path: /home/{{ USERNAME_AND_FILENAME_PREFIX }}-{{ item }}/.local/share/robonomics/chains/earth/db
     state: absent
-  loop: "{{ collators_index }}" 
+  loop: "{{ target_collators_index }}" 
   tags: [ never, remove_parachain_db, remove_dbs ]
 
 - name: Start robonomics service
@@ -119,4 +137,5 @@
     name: "{{ USERNAME_AND_FILENAME_PREFIX }}-{{ item }}.service"
     state: restarted
     enabled: yes
-  loop: "{{ collators_index }}"
+  loop: "{{ target_collators_index }}"
+  tags: [ start, restart, remove_relaychain_db, remove_parachain_db, remove_dbs ]
