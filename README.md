@@ -77,10 +77,9 @@ Ansible role for deploy robonomics collators
     $ cat ./main.yml 
     ---
     - hosts: robonomics-collators
-    user: root
-    roles:
+      user: root
+      roles:
         - robonomics-collator-role
-
     ```
 
 
