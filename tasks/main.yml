@@ -119,6 +119,7 @@
     - ufw: rule=deny direction=out dest='100.64.0.0/10'
     - ufw: rule=deny direction=out dest='198.18.0.0/15'
     - ufw: rule=deny direction=out dest='169.254.0.0/16'
+  tags: [ always, ufw ]
 
 - name: Template robonomics.service
   template:
@@ -150,4 +151,4 @@
     state: restarted
     enabled: yes
   loop: "{{ target_collators_index }}"
-  tags: [ start, restart, remove_relaychain_db, remove_parachain_db, remove_dbs ]
+  tags: [ start, restart, remove_relaychain_db, remove_parachain_db, remove_dbs, ufw ]
