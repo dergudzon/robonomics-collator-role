@@ -1,0 +1,46 @@
+---
+- name: SET FACTS
+  block:
+    ### Use inventory var 'host-collators-count' if it's defined, else use it from defaults
+    - name: "Set target collators count"
+      set_fact:
+        target_collators_count: "{{ hostvars[inventory_hostname]['target-collators-count'] | int }}"
+      when: hostvars[inventory_hostname]['target-collators-count'] is defined
+
+    ### Use inventory var 'server-name' if it's defined, else use it from defaults
+    - name: "Set server_name"
+      set_fact:
+        server_name: "{{ hostvars[inventory_hostname]['server-name'] }}"
+      when: hostvars[inventory_hostname]['server-name'] is defined
+
+    - name: "Generate target collators index"
+      set_fact: target_collators_index={{ range(1, target_collators_count|int + 1) | list }}
+        
+    - name: "Generate target collators users list"
+      set_fact: target_collators_users={{ target_collators_users | default([]) + ['-'.join((USERNAME_AND_FILENAME_PREFIX, item|string))] }}
+      loop: "{{ target_collators_index | list }}"
+
+    - name: "Determine existing collators users list"
+      shell: 'grep "{{ USERNAME_AND_FILENAME_PREFIX }}" /etc/group | cut -d: -f1 | tr \",\" \"\\n\"'
+      changed_when: false 
+      register: existing_collators_users
+
+    - name: "Generate unecessary users list"
+      set_fact: unecessary_users={{ existing_collators_users.stdout_lines | difference(target_collators_users) }}
+  tags: [ always ]
+
+- name: DEBUG FACTS
+  block:
+    - name: "DEBUG: Server name"
+      debug: msg={{ server_name }}
+    - name: "DEBUG: Target collators count"
+      debug: msg={{ target_collators_count }}
+    - name: "DEBUG: Target collators index"
+      debug: msg={{ target_collators_index }}
+    - name: "DEBUG: Target users"
+      debug: msg={{ target_collators_users }}
+    - name: "DEBUG: Existing users"
+      debug: msg={{ existing_collators_users }}
+    - name: "DEBUG: Unecessary users"
+      debug: msg="{{ unecessary_users }}"
+  tags: [ never, debug ]

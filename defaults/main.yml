@@ -5,6 +5,7 @@ USERNAME_AND_FILENAME_PREFIX: "robonomics-collator"
 server_name: servername
 nodename_prefix: "robonomics-collator"
 parachain_id: 1000
+parachain_name: earth
 telemetry_url: "wss://telemetry.polkadot.io/submit/ 0"
 chain_id: rococo_local_testnet
 target_collators_count: 1

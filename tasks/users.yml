@@ -1,0 +1,39 @@
+---
+- name: USERS MANAGEMENT
+  block:
+    - name: "Remove unnecessary users"
+      ansible.builtin.user:
+        name: "{{ item }}"
+        state: absent
+        remove: yes
+      loop: "{{ unecessary_users }}"
+
+    - name: "Delete unecessary services"
+      file:
+        path: /etc/systemd/system/{{ item }}.service
+        state: absent
+      loop: "{{ unecessary_users }}"
+
+    - name: "Create collators users"
+      user:
+        name: "{{ USERNAME_AND_FILENAME_PREFIX }}-{{ item }}"
+        state: present
+      loop: "{{ target_collators_index }}"
+  tags: [ always ]
+
+
+- name: REMOVE ALL USERS AND SERVICES
+  block:
+    - name: "Remove all collators users"
+      ansible.builtin.user:
+        name: "{{ item }}"
+        state: absent
+        remove: yes
+      loop: "{{ existing_collators_users.stdout_lines }}"
+
+    - name: "Delete all collators services"
+      file:
+        path: /etc/systemd/system/{{ item }}.service
+        state: absent
+      loop: "{{ existing_collators_users.stdout_lines }}"
+  tags: [ never, remove ]

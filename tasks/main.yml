@@ -1,49 +1,6 @@
 ---
-- name: SET FACTS
-  block:
-    ### Use inventory var 'host-collators-count' if it's defined, else use it from defaults
-    - name: "Set target collators count"
-      set_fact:
-        target_collators_count: "{{ hostvars[inventory_hostname]['target-collators-count'] | int }}"
-      when: hostvars[inventory_hostname]['target-collators-count'] is defined
-
-    ### Use inventory var 'server-name' if it's defined, else use it from defaults
-    - name: "Set server_name"
-      set_fact:
-        server_name: "{{ hostvars[inventory_hostname]['server-name'] }}"
-      when: hostvars[inventory_hostname]['server-name'] is defined
-
-    - name: "Generate target collators index"
-      set_fact: target_collators_index={{ range(1, target_collators_count|int + 1) | list }}
-        
-    - name: "Generate target collators users list"
-      set_fact: target_collators_users={{ target_collators_users | default([]) + ['-'.join((USERNAME_AND_FILENAME_PREFIX, item|string))] }}
-      loop: "{{ target_collators_index | list }}"
-
-    - name: "Determine existing collators users list"
-      shell: 'grep "{{ USERNAME_AND_FILENAME_PREFIX }}" /etc/group | cut -d: -f1 | tr \",\" \"\\n\"'
-      changed_when: false 
-      register: existing_collators_users
-
-    - name: "Generate unecessary users list"
-      set_fact: unecessary_users={{ existing_collators_users.stdout_lines | difference(target_collators_users) }}
-  tags: [ always ]
-
-- name: DEBUG FACTS
-  block:
-    - name: "Server name"
-      debug: msg={{ server_name }}
-    - name: "Target collators count"
-      debug: msg={{ target_collators_count }}
-    - name: "Target collators index"
-      debug: msg={{ target_collators_index }}
-    - name: "Target users"
-      debug: msg={{ target_collators_users }}
-    - name: "Existing users"
-      debug: msg={{ existing_collators_users }}
-    - name: "Unecessary users"
-      debug: msg="{{ unecessary_users }}"
-  tags: [ debug ]
+- import_tasks: set_facts.yml
+- import_tasks: ufw.yml
 
 - name: STOP ALL EXISTING ROBONOMICS SERVICES
   block:
@@ -56,94 +13,10 @@
       debug: msg="beep beep just go ahead"
   tags: [ always ]
 
-- name: USERS MANAGEMENT
-  block:
-    - name: "Remove unnecessary users"
-      ansible.builtin.user:
-        name: "{{ item }}"
-        state: absent
-        remove: yes
-      loop: "{{ unecessary_users }}"
-
-    - name: "Delete unecessary services"
-      file:
-        path: /etc/systemd/system/{{ item }}.service
-        state: absent
-      loop: "{{ unecessary_users }}"
-
-    - name: "Create collators users"
-      user:
-        name: "{{ USERNAME_AND_FILENAME_PREFIX }}-{{ item }}"
-        state: present
-      loop: "{{ target_collators_index }}"
-
-- name: REMOVE ALL USERS AND SERVICES
-  block:
-    - name: "Remove all collators users"
-      ansible.builtin.user:
-        name: "{{ item }}"
-        state: absent
-        remove: yes
-      loop: "{{ existing_collators_users.stdout_lines }}"
-
-    - name: "Delete all collators services"
-      file:
-        path: /etc/systemd/system/{{ item }}.service
-        state: absent
-      loop: "{{ existing_collators_users.stdout_lines }}"
-  tags: [ never, remove ]
-
-- name: UPLOAD ROBONOMICS BINARY TO THE SERVER
-  # Upload files/robonomics if it exists, else download binary from github releases 
-  block:
-    - name: "Upload robonomics binary to server from role files"
-      copy: src=robonomics  dest=/usr/bin/robonomics mode='0755'
-  rescue:
-    - name: Download Robonomics archive
-      get_url: url=https://github.com/airalab/robonomics/releases/download/v{{ robonomics_version }}/robonomics-{{ robonomics_version }}-x86_64-unknown-linux-gnu.tar.gz dest=/root/
-
-    - name: Unpack Robonomics binary to /usr/bin/robonomics
-      ansible.builtin.unarchive: src=/root/robonomics-{{ robonomics_version }}-x86_64-unknown-linux-gnu.tar.gz dest=/usr/bin/ remote_src=yes
-
-# TODO UFW
-- name: UFW RULES
-  block:
-    - ufw: state=enabled policy=allow 
-    - ufw: rule=allow name=OpenSSH
-    # - ufw: rule=allow port='30333'
-    # - ufw: rule=allow port='30334'
-    - ufw: rule=allow port='9615'
-    - ufw: rule=deny direction=out dest='10.0.0.0/8'
-    - ufw: rule=deny direction=out dest='172.16.0.0/12'
-    - ufw: rule=deny direction=out dest='192.168.0.0/16'
-    - ufw: rule=deny direction=out dest='100.64.0.0/10'
-    - ufw: rule=deny direction=out dest='198.18.0.0/15'
-    - ufw: rule=deny direction=out dest='169.254.0.0/16'
-  tags: [ always, ufw ]
-
-- name: Template robonomics.service
-  template:
-    src: robonomics-collator.service.j2
-    dest: /etc/systemd/system/{{ USERNAME_AND_FILENAME_PREFIX }}-{{ item }}.service
-  loop: "{{ target_collators_index }}"
-
-- name: "Reload systemd"
-  shell: systemctl daemon-reload
-  tags: [ always ]
-
-- name: Remove relay db
-  file:
-    path: /home/{{ USERNAME_AND_FILENAME_PREFIX }}-{{ item }}/.local/share/robonomics/polkadot/chains/{{ chain_id }}/db
-    state: absent 
-  loop: "{{ target_collators_index }}"
-  tags: [ never, remove_relaychain_db, remove_dbs ]
-
-- name: Remove parachain db
-  file:
-    path: /home/{{ USERNAME_AND_FILENAME_PREFIX }}-{{ item }}/.local/share/robonomics/chains/earth/db
-    state: absent
-  loop: "{{ target_collators_index }}" 
-  tags: [ never, remove_parachain_db, remove_dbs ]
+- import_tasks: users.yml
+- import_tasks: binary.yml
+- import_tasks: service.yml
+- import_tasks: dbs.yml
 
 - name: Start robonomics service
   service:
@@ -151,4 +24,4 @@
     state: restarted
     enabled: yes
   loop: "{{ target_collators_index }}"
-  tags: [ start, restart, remove_relaychain_db, remove_parachain_db, remove_dbs, ufw ]
+  tags: [ start, restart, ufw ]

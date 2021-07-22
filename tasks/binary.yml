@@ -1,0 +1,12 @@
+---
+- name: UPLOAD ROBONOMICS BINARY TO THE SERVER
+  # Upload files/robonomics if it exists, else download binary from github releases 
+  block:
+    - name: "Upload robonomics binary to server from role files"
+      copy: src=robonomics  dest=/usr/bin/robonomics mode='0755'
+  rescue:
+    - name: Download Robonomics archive
+      get_url: url=https://github.com/airalab/robonomics/releases/download/v{{ robonomics_version }}/robonomics-{{ robonomics_version }}-x86_64-unknown-linux-gnu.tar.gz dest=/root/
+
+    - name: Unpack Robonomics binary to /usr/bin/robonomics
+      ansible.builtin.unarchive: src=/root/robonomics-{{ robonomics_version }}-x86_64-unknown-linux-gnu.tar.gz dest=/usr/bin/ remote_src=yes
