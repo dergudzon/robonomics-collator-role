@@ -1,0 +1,32 @@
+---
+- name: ADD CRON RULES
+  block:
+    - name: "Create directory for scripts"
+      file:
+        path: /home/{{ USERNAME_AND_FILENAME_PREFIX }}-{{ item }}/scripts
+        state: directory
+        mode: "0755"
+      loop: "{{ target_collators_index }}"
+
+    - name: "Template cron-collator.sh to user cron"
+      template:
+        src: cron-collator.sh.j2
+        dest: /home/{{ USERNAME_AND_FILENAME_PREFIX }}-{{ item }}/scripts/cron-collator.sh
+      loop: "{{ target_collators_index }}"
+      notify:
+        - daemon-reload
+
+    - name: "Add users scripts cron-collator.sh to crontab"
+      ansible.builtin.cron:
+        name: "Restart collator {{ USERNAME_AND_FILENAME_PREFIX }}-{{ item }} if delay"
+        minute: "*/5"
+        job: "/home/{{ USERNAME_AND_FILENAME_PREFIX }}-{{ item }}/scripts/cron-collator.sh > /dev/null 2>&1"
+      loop: "{{ target_collators_index }}"
+      notify: crond-restart
+  tags: [ init, cron ]
+
+
+- name: REMOVE CRON RULES
+  shell: crontab -r
+  notify: crond-restart
+  tags: [ remove ]

@@ -1,8 +1,9 @@
 ---
-- name: Template robonomics.service
+- name: Template robonomics-collator.service
   template:
     src: robonomics-collator.service.j2
     dest: /etc/systemd/system/{{ USERNAME_AND_FILENAME_PREFIX }}-{{ item }}.service
   loop: "{{ target_collators_index }}"
   notify:
     - daemon-reload
+  tags: [ init, service ]

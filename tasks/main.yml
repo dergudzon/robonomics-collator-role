@@ -14,6 +14,7 @@
   tags: [ always ]
 
 - import_tasks: users.yml
+- import_tasks: cron.yml
 - import_tasks: binary.yml
 - import_tasks: service.yml
 - import_tasks: dbs.yml
